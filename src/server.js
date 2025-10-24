@@ -47,7 +47,25 @@ const shiprocketService = require("./services/shiprocketService");
 const shiprocketRoutes = require("./routes/shiprocket");
 
 // Import Wakeup service
-const wakeupService = require("./services/wakeupService");
+let wakeupService;
+try {
+  wakeupService = require("./services/wakeupService");
+  console.log('✅ Wakeup service loaded successfully');
+  console.log('🔍 Wakeup service type:', typeof wakeupService);
+  console.log('🔍 Wakeup service has start method:', typeof wakeupService.start);
+  console.log('🔍 Wakeup service methods:', Object.getOwnPropertyNames(wakeupService));
+} catch (error) {
+  console.error('❌ Failed to load wakeup service:', error.message);
+  console.error('❌ Error stack:', error.stack);
+  // Create a mock wakeup service to prevent crashes
+  wakeupService = {
+    start: () => console.log('⚠️ Wakeup service disabled due to loading error'),
+    stop: () => console.log('⚠️ Wakeup service disabled'),
+    getStatus: () => ({ active: false, error: 'Service not loaded' }),
+    triggerWakeup: () => console.log('⚠️ Wakeup service disabled'),
+    getExternalPingRecommendations: () => ({ error: 'Service not loaded' })
+  };
+}
 
 const app = express();
 
@@ -93,7 +111,9 @@ app.get("/api/wakeup", (req, res) => {
 });
 
 app.get("/api/wakeup/status", (req, res) => {
-  const status = wakeupService.getStatus();
+  const status = wakeupService && typeof wakeupService.getStatus === 'function' 
+    ? wakeupService.getStatus() 
+    : { active: false, error: 'Service not available' };
   res.json({
     wakeup: status,
     server: {
@@ -106,7 +126,11 @@ app.get("/api/wakeup/status", (req, res) => {
 
 app.post("/api/wakeup/trigger", (req, res) => {
   console.log('🔔 Manual wakeup trigger requested');
-  wakeupService.triggerWakeup();
+  if (wakeupService && typeof wakeupService.triggerWakeup === 'function') {
+    wakeupService.triggerWakeup();
+  } else {
+    console.log('⚠️ Wakeup service not available');
+  }
   res.json({ 
     status: "triggered", 
     time: new Date().toISOString(),
@@ -115,7 +139,9 @@ app.post("/api/wakeup/trigger", (req, res) => {
 });
 
 app.get("/api/wakeup/recommendations", (req, res) => {
-  const recommendations = wakeupService.getExternalPingRecommendations();
+  const recommendations = wakeupService && typeof wakeupService.getExternalPingRecommendations === 'function'
+    ? wakeupService.getExternalPingRecommendations()
+    : { error: 'Service not available' };
   res.json(recommendations);
 });
 
@@ -969,7 +995,11 @@ app.listen(PORT, () => {
   
   // Start automatic wakeup service
   if (process.env.NODE_ENV === 'production' || process.env.ENABLE_WAKEUP === 'true') {
-    wakeupService.start();
+    if (wakeupService && typeof wakeupService.start === 'function') {
+      wakeupService.start();
+    } else {
+      console.log('⚠️ Wakeup service not available or start method missing');
+    }
   } else {
     console.log('🔄 Wakeup service disabled in development mode');
   }
@@ -1007,3 +1037,4 @@ app.listen(PORT, () => {
   console.log(`   - GET  /api/shiprocket/track/:awbCode - Track shipment`);
   console.log(`   - GET  /api/shiprocket/couriers - Get available couriers`);
 });
+
