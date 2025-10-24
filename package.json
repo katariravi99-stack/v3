@@ -4,7 +4,8 @@
   "description": "Consolidated backend server for Varaha Silks - All services in one place",
   "main": "src/server.js",
   "scripts": {
-    "start": "node start-server.js",
+    "start": "node src/server.js",
+    "start:with-check": "node start-server.js",
     "dev": "nodemon src/server.js",
     "razorpay": "node razorpay-server.js",
     "dev:razorpay": "nodemon razorpay-server.js",
