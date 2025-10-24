@@ -8,8 +8,8 @@
  * 
  * Usage:
  * - Direct execution: node src/utils/wakeupCron.js
- * - Cron job: */5 * * * * node /path/to/src/utils/wakeupCron.js
- * - PM2: pm2 start src/utils/wakeupCron.js --cron "*/5 * * * *"
+ * - Cron job: Run every 5 minutes with cron expression
+ * - PM2: pm2 start src/utils/wakeupCron.js --cron "every 5 minutes"
  */
 
 const axios = require('axios');
