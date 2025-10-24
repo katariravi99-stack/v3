@@ -1,275 +1,265 @@
+#!/usr/bin/env node
+
 /**
- * Automatic Wakeup Service for Varaha Silks Backend
+ * Automated Wakeup Cron Script for Varaha Silks Backend
  * 
- * This service provides multiple strategies to keep the backend awake:
- * 1. Self-ping mechanism
- * 2. External ping services integration
- * 3. Health check optimization
- * 4. Cron job scheduling
+ * This script can be run as a cron job to keep the backend awake.
+ * It performs various wakeup strategies and can be scheduled to run every few minutes.
+ * 
+ * Usage:
+ * - Direct execution: node src/utils/wakeupCron.js
+ * - Cron job: Run every 5 minutes with cron expression
+ * - PM2: pm2 start src/utils/wakeupCron.js --cron "every 5 minutes"
  */
 
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
-class WakeupService {
+class WakeupCron {
   constructor() {
-    this.isActive = false;
-    this.pingInterval = null;
-    this.healthCheckInterval = null;
-    this.externalPingServices = [
-      'https://uptimerobot.com',
-      'https://pingdom.com',
-      'https://statuscake.com'
-    ];
     this.backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    this.pingIntervalMs = parseInt(process.env.WAKEUP_INTERVAL_MS) || 14 * 60 * 1000; // 14 minutes default
-    this.healthCheckIntervalMs = parseInt(process.env.HEALTH_CHECK_INTERVAL_MS) || 5 * 60 * 1000; // 5 minutes default
+    this.logFile = path.join(__dirname, '../../logs/wakeup-cron.log');
+    this.maxLogSize = 10 * 1024 * 1024; // 10MB
+    this.retryAttempts = 3;
+    this.retryDelay = 5000; // 5 seconds
   }
 
   /**
-   * Start the wakeup service
+   * Initialize the wakeup cron
    */
-  start() {
-    if (this.isActive) {
-      console.log('🔄 Wakeup service is already running');
-      return;
-    }
-
-    console.log('🚀 Starting automatic wakeup service...');
+  async init() {
+    console.log('🚀 Starting Wakeup Cron Job...');
     console.log(`📍 Backend URL: ${this.backendUrl}`);
-    console.log(`⏰ Ping interval: ${this.pingIntervalMs / 1000 / 60} minutes`);
-    console.log(`💓 Health check interval: ${this.healthCheckIntervalMs / 1000 / 60} minutes`);
+    console.log(`📝 Log file: ${this.logFile}`);
+    console.log(`⏰ Started at: ${new Date().toISOString()}`);
 
-    this.isActive = true;
+    // Ensure log directory exists
+    this.ensureLogDirectory();
 
-    // Start self-ping mechanism
-    this.startSelfPing();
+    // Perform wakeup operations
+    await this.performWakeup();
 
-    // Start health check optimization
-    this.startHealthCheckOptimization();
-
-    // Log wakeup service status
-    this.logStatus();
-
-    console.log('✅ Automatic wakeup service started successfully');
+    console.log('✅ Wakeup Cron Job completed');
   }
 
   /**
-   * Stop the wakeup service
+   * Ensure log directory exists
    */
-  stop() {
-    if (!this.isActive) {
-      console.log('🔄 Wakeup service is not running');
-      return;
+  ensureLogDirectory() {
+    const logDir = path.dirname(this.logFile);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
     }
-
-    console.log('🛑 Stopping automatic wakeup service...');
-
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
-      this.healthCheckInterval = null;
-    }
-
-    this.isActive = false;
-    console.log('✅ Automatic wakeup service stopped');
   }
 
   /**
-   * Start self-ping mechanism
+   * Perform wakeup operations
    */
-  startSelfPing() {
-    console.log('🔄 Starting self-ping mechanism...');
+  async performWakeup() {
+    const startTime = Date.now();
+    let success = false;
+    let error = null;
 
-    // Initial ping
-    this.performSelfPing();
-
-    // Set up interval
-    this.pingInterval = setInterval(() => {
-      this.performSelfPing();
-    }, this.pingIntervalMs);
-  }
-
-  /**
-   * Perform self-ping to keep the service awake
-   */
-  async performSelfPing() {
     try {
-      const startTime = Date.now();
+      // Try multiple wakeup strategies
+      await this.tryHealthCheck();
+      await this.tryWakeupEndpoint();
+      await this.tryProductsEndpoint();
       
-      // Ping the health endpoint
-      const response = await axios.get(`${this.backendUrl}/api/health`, {
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'Varaha-Silks-Wakeup-Service/1.0'
-        }
-      });
-
-      const responseTime = Date.now() - startTime;
-
-      if (response.status === 200) {
-        console.log(`✅ Self-ping successful (${responseTime}ms) - Backend is awake`);
-        console.log(`📊 Response: ${JSON.stringify(response.data)}`);
-      } else {
-        console.log(`⚠️ Self-ping returned status ${response.status}`);
-      }
-
-    } catch (error) {
-      console.error('❌ Self-ping failed:', error.message);
+      success = true;
+      console.log('✅ All wakeup operations completed successfully');
       
-      // Try alternative endpoints
-      await this.tryAlternativeEndpoints();
+    } catch (err) {
+      error = err;
+      console.error('❌ Wakeup operations failed:', err.message);
+    }
+
+    const duration = Date.now() - startTime;
+    
+    // Log the result
+    await this.logResult({
+      timestamp: new Date().toISOString(),
+      success,
+      duration,
+      error: error ? error.message : null,
+      backendUrl: this.backendUrl
+    });
+
+    if (!success) {
+      process.exit(1);
     }
   }
 
   /**
-   * Try alternative endpoints if main health check fails
+   * Try health check endpoint
    */
-  async tryAlternativeEndpoints() {
-    const alternativeEndpoints = [
-      '/',
-      '/api/products',
-      '/api/health'
-    ];
-
-    for (const endpoint of alternativeEndpoints) {
+  async tryHealthCheck() {
+    console.log('🔄 Trying health check endpoint...');
+    
+    for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
       try {
-        console.log(`🔄 Trying alternative endpoint: ${endpoint}`);
-        const response = await axios.get(`${this.backendUrl}${endpoint}`, {
-          timeout: 5000,
+        const response = await axios.get(`${this.backendUrl}/api/health`, {
+          timeout: 10000,
           headers: {
-            'User-Agent': 'Varaha-Silks-Wakeup-Service/1.0'
+            'User-Agent': 'Varaha-Silks-Wakeup-Cron/1.0'
           }
         });
 
         if (response.status === 200) {
-          console.log(`✅ Alternative endpoint ${endpoint} responded successfully`);
+          console.log(`✅ Health check successful (attempt ${attempt})`);
           return;
         }
-      } catch (error) {
-        console.log(`❌ Alternative endpoint ${endpoint} failed: ${error.message}`);
-      }
-    }
-
-    console.error('❌ All endpoints failed - backend may be down');
-  }
-
-  /**
-   * Start health check optimization
-   */
-  startHealthCheckOptimization() {
-    console.log('💓 Starting health check optimization...');
-
-    // Initial health check
-    this.performHealthCheck();
-
-    // Set up interval
-    this.healthCheckInterval = setInterval(() => {
-      this.performHealthCheck();
-    }, this.healthCheckIntervalMs);
-  }
-
-  /**
-   * Perform optimized health check
-   */
-  async performHealthCheck() {
-    try {
-      const startTime = Date.now();
-      
-      const response = await axios.get(`${this.backendUrl}/api/health`, {
-        timeout: 5000,
-        headers: {
-          'User-Agent': 'Varaha-Silks-Health-Check/1.0',
-          'Cache-Control': 'no-cache'
-        }
-      });
-
-      const responseTime = Date.now() - startTime;
-
-      if (response.status === 200) {
-        console.log(`💓 Health check passed (${responseTime}ms)`);
+      } catch (err) {
+        console.log(`❌ Health check attempt ${attempt} failed: ${err.message}`);
         
-        // Log additional health metrics
-        const healthData = response.data;
-        if (healthData.services) {
-          console.log(`📊 Services status: ${healthData.services}`);
-        }
-        if (healthData.version) {
-          console.log(`🔖 Backend version: ${healthData.version}`);
+        if (attempt < this.retryAttempts) {
+          console.log(`⏳ Retrying in ${this.retryDelay / 1000} seconds...`);
+          await this.sleep(this.retryDelay);
+        } else {
+          throw new Error(`Health check failed after ${this.retryAttempts} attempts: ${err.message}`);
         }
       }
-
-    } catch (error) {
-      console.error('❌ Health check failed:', error.message);
     }
   }
 
   /**
-   * Get wakeup service status
+   * Try wakeup endpoint
    */
-  getStatus() {
+  async tryWakeupEndpoint() {
+    console.log('🔄 Trying wakeup endpoint...');
+    
+    for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
+      try {
+        const response = await axios.get(`${this.backendUrl}/api/wakeup`, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Varaha-Silks-Wakeup-Cron/1.0'
+          }
+        });
+
+        if (response.status === 200) {
+          console.log(`✅ Wakeup endpoint successful (attempt ${attempt})`);
+          return;
+        }
+      } catch (err) {
+        console.log(`❌ Wakeup endpoint attempt ${attempt} failed: ${err.message}`);
+        
+        if (attempt < this.retryAttempts) {
+          console.log(`⏳ Retrying in ${this.retryDelay / 1000} seconds...`);
+          await this.sleep(this.retryDelay);
+        } else {
+          throw new Error(`Wakeup endpoint failed after ${this.retryAttempts} attempts: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Try products endpoint
+   */
+  async tryProductsEndpoint() {
+    console.log('🔄 Trying products endpoint...');
+    
+    for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
+      try {
+        const response = await axios.get(`${this.backendUrl}/api/products`, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Varaha-Silks-Wakeup-Cron/1.0'
+          }
+        });
+
+        if (response.status === 200) {
+          console.log(`✅ Products endpoint successful (attempt ${attempt})`);
+          return;
+        }
+      } catch (err) {
+        console.log(`❌ Products endpoint attempt ${attempt} failed: ${err.message}`);
+        
+        if (attempt < this.retryAttempts) {
+          console.log(`⏳ Retrying in ${this.retryDelay / 1000} seconds...`);
+          await this.sleep(this.retryDelay);
+        } else {
+          throw new Error(`Products endpoint failed after ${this.retryAttempts} attempts: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Log the result to file
+   */
+  async logResult(result) {
+    try {
+      const logEntry = JSON.stringify(result) + '\n';
+      
+      // Check if log file is too large
+      if (fs.existsSync(this.logFile)) {
+        const stats = fs.statSync(this.logFile);
+        if (stats.size > this.maxLogSize) {
+          // Rotate log file
+          const rotatedFile = this.logFile + '.old';
+          if (fs.existsSync(rotatedFile)) {
+            fs.unlinkSync(rotatedFile);
+          }
+          fs.renameSync(this.logFile, rotatedFile);
+        }
+      }
+      
+      fs.appendFileSync(this.logFile, logEntry);
+      console.log(`📝 Result logged to ${this.logFile}`);
+      
+    } catch (err) {
+      console.error('❌ Failed to log result:', err.message);
+    }
+  }
+
+  /**
+   * Sleep utility
+   */
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get cron job recommendations
+   */
+  getCronRecommendations() {
     return {
-      isActive: this.isActive,
-      backendUrl: this.backendUrl,
-      pingIntervalMs: this.pingIntervalMs,
-      healthCheckIntervalMs: this.healthCheckIntervalMs,
-      hasPingInterval: !!this.pingInterval,
-      hasHealthCheckInterval: !!this.healthCheckInterval,
-      uptime: process.uptime(),
-      memoryUsage: process.memoryUsage(),
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  /**
-   * Log current status
-   */
-  logStatus() {
-    const status = this.getStatus();
-    console.log('📊 Wakeup Service Status:');
-    console.log(`   Active: ${status.isActive}`);
-    console.log(`   Backend URL: ${status.backendUrl}`);
-    console.log(`   Ping Interval: ${status.pingIntervalMs / 1000 / 60} minutes`);
-    console.log(`   Health Check Interval: ${status.healthCheckIntervalMs / 1000 / 60} minutes`);
-    console.log(`   Uptime: ${Math.floor(status.uptime / 60)} minutes`);
-    console.log(`   Memory Usage: ${Math.round(status.memoryUsage.heapUsed / 1024 / 1024)}MB`);
-  }
-
-  /**
-   * Manual wakeup trigger
-   */
-  async triggerWakeup() {
-    console.log('🔔 Manual wakeup triggered');
-    await this.performSelfPing();
-  }
-
-  /**
-   * Get external ping service recommendations
-   */
-  getExternalPingRecommendations() {
-    return {
-      services: this.externalPingServices,
-      recommendedEndpoints: [
-        `${this.backendUrl}/api/health`,
-        `${this.backendUrl}/api/products`,
-        `${this.backendUrl}/`
+      cronExpressions: [
+        '*/5 * * * *',  // Every 5 minutes
+        '*/10 * * * *', // Every 10 minutes
+        '*/15 * * * *', // Every 15 minutes
+        '*/30 * * * *'  // Every 30 minutes
       ],
-      recommendedInterval: '5-10 minutes',
+      recommended: '*/10 * * * *', // Every 10 minutes
       setupInstructions: [
-        '1. Sign up for an external ping service (UptimeRobot, Pingdom, etc.)',
-        '2. Add your backend URL as a monitor',
-        '3. Set ping interval to 5-10 minutes',
-        '4. Configure alerts for downtime',
-        '5. Use the /api/health endpoint for monitoring'
+        '1. Open crontab: crontab -e',
+        '2. Add this line: */10 * * * * cd /path/to/your/project && node src/utils/wakeupCron.js',
+        '3. Save and exit',
+        '4. Verify: crontab -l',
+        '5. Check logs: tail -f logs/wakeup-cron.log'
+      ],
+      pm2Setup: [
+        '1. Install PM2: npm install -g pm2',
+        '2. Create ecosystem file: pm2 ecosystem',
+        '3. Add wakeup cron to ecosystem.config.js',
+        '4. Start: pm2 start ecosystem.config.js',
+        '5. Save: pm2 save && pm2 startup'
       ]
     };
   }
 }
 
-// Create singleton instance
-const wakeupService = new WakeupService();
+// Run the wakeup cron if this file is executed directly
+if (require.main === module) {
+  const wakeupCron = new WakeupCron();
+  wakeupCron.init().catch(err => {
+    console.error('❌ Wakeup cron failed:', err);
+    process.exit(1);
+  });
+}
 
-module.exports = wakeupService;
+module.exports = WakeupCron;
+
