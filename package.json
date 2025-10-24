@@ -4,11 +4,11 @@
   "description": "Consolidated backend server for Varaha Silks - All services in one place",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node start-server.js",
     "dev": "nodemon src/server.js",
     "razorpay": "node razorpay-server.js",
     "dev:razorpay": "nodemon razorpay-server.js",
-    "build": "echo 'Build completed - using source files directly'",
+    "build": "npm install && node verify-deps.js && echo 'Build completed - dependencies verified'",
     "postinstall": "echo 'Dependencies installed successfully'",
     "wakeup": "node src/utils/wakeupCron.js",
     "wakeup:dev": "nodemon src/utils/wakeupCron.js",
