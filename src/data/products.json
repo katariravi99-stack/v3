@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ban-01",
+    "name": "Banarasi Antique Zari Brocade",
+    "price": 19990,
+    "images": ["/assets/banarasi.jpeg"],
+    "type": "banarasi",
+    "stock": 8
+  },
+  {
+    "id": "kan-01",
+    "name": "Kanjivaram Temple Border",
+    "price": 22990,
+    "images": ["/assets/kanjivaram.jpeg"],
+    "type": "kanjivaram",
+    "stock": 5
+  }
+]

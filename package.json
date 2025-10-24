@@ -1,0 +1,51 @@
+{
+  "name": "varaha-silks-backend",
+  "version": "2.0.0",
+  "description": "Consolidated backend server for Varaha Silks - All services in one place",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "razorpay": "node razorpay-server.js",
+    "dev:razorpay": "nodemon razorpay-server.js",
+    "build": "echo 'Build completed - using source files directly'",
+    "postinstall": "echo 'Dependencies installed successfully'",
+    "wakeup": "node src/utils/wakeupCron.js",
+    "wakeup:dev": "nodemon src/utils/wakeupCron.js",
+    "wakeup:pm2": "pm2 start ecosystem.config.js --only varaha-silks-wakeup-cron",
+    "wakeup:pm2:stop": "pm2 stop varaha-silks-wakeup-cron",
+    "wakeup:pm2:restart": "pm2 restart varaha-silks-wakeup-cron",
+    "wakeup:pm2:logs": "pm2 logs varaha-silks-wakeup-cron",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status",
+    "pm2:save": "pm2 save",
+    "pm2:startup": "pm2 startup"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.0.0",
+    "razorpay": "^2.9.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "rimraf": "^6.0.1"
+  },
+  "keywords": [
+    "razorpay",
+    "firebase",
+    "payment",
+    "backend",
+    "api",
+    "ecommerce",
+    "silk",
+    "sarees"
+  ],
+  "author": "Varaha Silks",
+  "license": "MIT"
+}
