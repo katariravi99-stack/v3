@@ -388,7 +388,28 @@ app.post("/api/orders/create", async (req, res) => {
   try {
     const { amount, currency, receipt, notes } = req.body;
     
-    console.log('Creating Razorpay order:', { amount, currency, receipt, notes });
+    console.log('🔍 Received request to create Razorpay order:');
+    console.log('📥 Request body:', req.body);
+    console.log('📥 Extracted data:', { amount, currency, receipt, notes });
+    
+    // Validate required fields
+    if (!amount || amount <= 0) {
+      console.error('❌ Invalid amount:', amount);
+      return res.status(400).json({ 
+        error: 'Invalid amount',
+        message: 'Amount must be greater than 0' 
+      });
+    }
+    
+    if (!receipt) {
+      console.error('❌ Missing receipt:', receipt);
+      return res.status(400).json({ 
+        error: 'Missing receipt',
+        message: 'Receipt is required' 
+      });
+    }
+    
+    console.log('✅ Validation passed, creating Razorpay order...');
     
     const order = await razorpay.orders.create({
       amount: amount,
@@ -397,10 +418,16 @@ app.post("/api/orders/create", async (req, res) => {
       notes: notes || {}
     });
     
-    console.log('Razorpay order created successfully:', order.id);
+    console.log('✅ Razorpay order created successfully:', order.id);
+    console.log('📤 Sending response:', order);
     res.json(order);
   } catch (error) {
-    console.error('Error creating Razorpay order:', error);
+    console.error('❌ Error creating Razorpay order:', error);
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ 
       error: 'Failed to create order',
       message: error.message 
@@ -662,118 +689,8 @@ app.get("/api/payments/status/:paymentId", async (req, res) => {
   }
 });
 
-// Shiprocket API endpoints
-app.post("/api/shiprocket/orders/create", async (req, res) => {
-  try {
-    const orderData = req.body;
-    console.log('Creating order in Shiprocket:', orderData.orderId);
-    
-    const result = await shiprocketService.createOrder(orderData);
-    res.json(result);
-  } catch (error) {
-    console.error('Error creating Shiprocket order:', error);
-    res.status(500).json({ 
-      error: 'Failed to create Shiprocket order',
-      message: error.message 
-    });
-  }
-});
-
-app.post("/api/shiprocket/assign-awb", async (req, res) => {
-  try {
-    const { shiprocketOrderId, courierId } = req.body;
-    console.log('Assigning AWB to order:', shiprocketOrderId);
-    
-    const result = await shiprocketService.assignAWB(shiprocketOrderId, courierId);
-    res.json(result);
-  } catch (error) {
-    console.error('Error assigning AWB:', error);
-    res.status(500).json({ 
-      error: 'Failed to assign AWB',
-      message: error.message 
-    });
-  }
-});
-
-app.post("/api/shiprocket/generate-label", async (req, res) => {
-  try {
-    const { shipmentId } = req.body;
-    console.log('Generating shipping label for:', shipmentId);
-    
-    const result = await shiprocketService.generateLabel(shipmentId);
-    res.json(result);
-  } catch (error) {
-    console.error('Error generating shipping label:', error);
-    res.status(500).json({ 
-      error: 'Failed to generate shipping label',
-      message: error.message 
-    });
-  }
-});
-
-app.get("/api/shiprocket/track/:awbCode", async (req, res) => {
-  try {
-    const { awbCode } = req.params;
-    console.log('Tracking shipment:', awbCode);
-    
-    const result = await shiprocketService.trackShipment(awbCode);
-    res.json(result);
-  } catch (error) {
-    console.error('Error tracking shipment:', error);
-    res.status(500).json({ 
-      error: 'Failed to track shipment',
-      message: error.message 
-    });
-  }
-});
-
-app.get("/api/shiprocket/shipment/:shiprocketOrderId", async (req, res) => {
-  try {
-    const { shiprocketOrderId } = req.params;
-    console.log('Getting shipment details for order:', shiprocketOrderId);
-    
-    const result = await shiprocketService.getShipmentDetails(shiprocketOrderId);
-    res.json(result);
-  } catch (error) {
-    console.error('Error getting shipment details:', error);
-    res.status(500).json({ 
-      error: 'Failed to get shipment details',
-      message: error.message 
-    });
-  }
-});
-
-// Get all orders from Shiprocket
-app.get("/api/shiprocket/orders", async (req, res) => {
-  try {
-    console.log('Getting all orders from Shiprocket...');
-    
-    const result = await shiprocketService.getAllOrders();
-    res.json(result);
-  } catch (error) {
-    console.error('Error getting orders from Shiprocket:', error);
-    res.status(500).json({ 
-      error: 'Failed to get orders from Shiprocket',
-      message: error.message 
-    });
-  }
-});
-
-app.get("/api/shiprocket/couriers", async (req, res) => {
-  try {
-    const { pincode, weight } = req.query;
-    console.log('Getting available couriers for pincode:', pincode);
-    
-    const result = await shiprocketService.getCouriers(pincode, weight);
-    res.json(result);
-  } catch (error) {
-    console.error('Error getting couriers:', error);
-    res.status(500).json({ 
-      error: 'Failed to get available couriers',
-      message: error.message 
-    });
-  }
-});
+// Use Shiprocket routes
+app.use('/api/shiprocket', shiprocketRoutes);
 
 
 // Sync order with Shiprocket data (with admin privileges)
@@ -1037,4 +954,3 @@ app.listen(PORT, () => {
   console.log(`   - GET  /api/shiprocket/track/:awbCode - Track shipment`);
   console.log(`   - GET  /api/shiprocket/couriers - Get available couriers`);
 });
-
